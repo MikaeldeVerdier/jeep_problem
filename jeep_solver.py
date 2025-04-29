@@ -195,11 +195,11 @@ class JeepSolver:
         # plt.legend()
 
         ani = animation.FuncAnimation(fig, animate, frames=len(index_script))
-        animation_path = os.path.join(self.save_path, f"animation{len(trips)}.gif")
+        animation_path = os.path.join(self.save_path, f"animation_{len(trips)}trips.gif")
         ani.save(animation_path, fps=fps)
 
 
 if __name__ == "__main__":
     solver = JeepSolver()
     solver.simulate_trip()
-    solver.visualize_trip()
+    # solver.visualize_trip()
