@@ -1,8 +1,8 @@
 # Visualizer arguments
-save_path = "visualizations2"  # Where to save results
+save_path = "visualizations"  # Where to save results
 
 # Simulation parameters
-n = 6  # Number of trips
+n = 1  # Number of trips
 
 # Visualization parameters
 slow_factor = 75  # Slow down factor for visualization

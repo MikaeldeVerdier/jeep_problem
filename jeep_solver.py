@@ -31,7 +31,7 @@ class JeepSolver:
             new_depo = self.get_depo(k, n - 1)
             self.fuel_dumps.append(new_depo)
 
-        self.fuel_dumps = np.array(self.fuel_dumps)
+        self.fuel_dumps = np.array(self.fuel_dumps).reshape(-1, 3)
         total_dist = 1 + np.sum(self.fuel_dumps[:, 2])
         self.fuel_dumps = np.vstack((self.fuel_dumps, [total_dist, 0, 0]))
 
@@ -156,7 +156,7 @@ class JeepSolver:
             prev_fuel_change = fuel_changes[i - 1][0] if i > 0 else 0
             index_script += list(range(prev_fuel_change, fuel_change[0] + 1)) + [fuel_change[0]] * paus_frames
 
-        index_script += list(range(fuel_changes[-1][0], len(xs))) + [len(xs) - 1] * paus_frames
+        index_script += list(range(fuel_changes[-1][0] if len(fuel_changes) else 0, len(xs))) + [len(xs) - 1] * paus_frames
         # """
 
         def animate(i):
@@ -175,7 +175,7 @@ class JeepSolver:
             point.set_data([x], [height / 2])
             text.set_position((x, height / 2 + 0.1))
 
-            np_fuel_change = np.array(fuel_changes)
+            np_fuel_change = np.array(fuel_changes).reshape(-1, 2)
             if index in np_fuel_change[:, 0]:
                 fuel_change = np.sum(np_fuel_change[np_fuel_change[:, 0] == index][:, 1])
                 # print("Fuel change at index", index, ":", fuel_change)
