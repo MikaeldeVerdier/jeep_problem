@@ -3,43 +3,39 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
-import viz_cfg
+import jeep_solver_config
 from files import create_path
 
-class FuelDump:
-    def __init__(self, x, volume, withdraw_size):
-        self.x = x
-        self.volume = volume
-        self.withdraw_size = withdraw_size
-
-        print("Created fuel dump at x:", x, "with volume:", volume, "and withdraw size:", withdraw_size)
-
-
-class Visualizer:
-    def __init__(self, save_path=viz_cfg.save_path):
+class JeepSolver:
+    def __init__(self, save_path=jeep_solver_config.save_path):
         self.save_path = save_path
 
         create_path(save_path)
 
     def get_depo(self, k, n):
         factor = 1 / (2 * n - 2 * k + 1)
-        new_x = factor + self.fuel_dumps[-1].x
+        new_x = factor + (self.fuel_dumps[-1][0] if len(self.fuel_dumps) else 0)
         new_volume = (2 * n - 2 * k - 1) * factor
         new_withdraw_size = factor
 
-        new_dump = FuelDump(new_x, new_volume, new_withdraw_size)
+        new_dump = [new_x, new_volume, new_withdraw_size]
+
+        print("Depo created at", new_dump[0], "with volume", new_dump[1], "and withdraw size", new_dump[2])
 
         return new_dump
 
-    def simulate_trip(self, n=viz_cfg.n):
-        self.fuel_dumps = [FuelDump(0, 0, 0)]
+    def simulate_trip(self, n=jeep_solver_config.n):
+        self.fuel_dumps = []
 
         for k in range(n - 1):
             new_depo = self.get_depo(k, n - 1)
             self.fuel_dumps.append(new_depo)
 
-        total_dist = 1 + sum([fuel.withdraw_size for fuel in self.fuel_dumps])
-        self.fuel_dumps.append(FuelDump(total_dist, 0, 0))
+        self.fuel_dumps = np.array(self.fuel_dumps)
+        total_dist = 1 + np.sum(self.fuel_dumps[:, 2])
+        self.fuel_dumps = np.vstack((self.fuel_dumps, [total_dist, 0, 0]))
+
+        print(f"Final distance crossed: {total_dist}")
 
     def generate_trips(self, dists, slow_factor, reverse=False):
         trips = []
@@ -53,28 +49,28 @@ class Visualizer:
 
         return trips
 
-    def visualize_trip(self, slow_factor=viz_cfg.slow_factor, fps=viz_cfg.fps, paus_time=viz_cfg.paus_time):
+    def visualize_trip(self, slow_factor=jeep_solver_config.slow_factor, fps=jeep_solver_config.fps, paus_time=jeep_solver_config.paus_time):
         xs = []
         fuels = []
         trips = []
         fuel_changes = []
 
-        for fuel_dump in self.fuel_dumps[1:]:
-            fuel_x = np.array([fuel.x for fuel in self.fuel_dumps[1:]])
+        for i, fuel_dump in enumerate(self.fuel_dumps):
+            is_last_iteration = i == len(self.fuel_dumps) - 1
 
-            passed = np.array(self.fuel_dumps[1:])[fuel_dump.x > fuel_x]
+            passed = self.fuel_dumps[fuel_dump[0] > self.fuel_dumps[:, 0]]
             x = []
 
-            dists = [(passed[i - 1].x if i > 0 else 0, passed_fuel.x) for i, passed_fuel in enumerate(passed)] + [(passed[-1].x if len(passed) else 0, fuel_dump.x)]
+            dists = [(passed[i - 1][0] if i > 0 else 0, passed_fuel[0]) for i, passed_fuel in enumerate(passed)] + [(passed[-1][0] if len(passed) else 0, fuel_dump[0])]
             forward_trips = self.generate_trips(dists, slow_factor)
             x.extend(forward_trips)
 
-            if fuel_dump != self.fuel_dumps[-1]:
+            if not is_last_iteration:
                 backward_trips = self.generate_trips(dists, slow_factor, reverse=True)  # forward_trips[::-1]
                 x.extend(backward_trips)
 
                 x = np.array(x)
-                deposited_fuel = [0] * len(forward_trips) + [fuel_dump.volume] * len(forward_trips)
+                deposited_fuel = [0] * len(forward_trips) + [fuel_dump[1]] * len(backward_trips)
                 a = -np.diff(backward_trips, prepend=backward_trips[0])
                 h = np.cumsum(a)
                 x_covered = np.concatenate((forward_trips, h + forward_trips[-1]))
@@ -90,24 +86,23 @@ class Visualizer:
 
             xs.extend(x)
 
-            fuel_x = np.array([fuel.x for fuel in self.fuel_dumps if fuel != fuel_dump])
-            withdraw_volumes = np.array([fuel.withdraw_size for fuel in self.fuel_dumps if fuel != fuel_dump])
+            fuel_x = np.delete(self.fuel_dumps, i, axis=0)[:, 0]
+            withdraw_volumes = np.delete(self.fuel_dumps, i, axis=0)[:, 2]
 
             is_stopped = np.tile(np.diff(x, prepend=0)[:, None] == 0, (1, len(fuel_x)))
-            pos_passed_fuel_mask11 = (x[:, None] >= fuel_x[None]) & is_stopped
-            pos_passed_fuel_mask = np.maximum.accumulate(pos_passed_fuel_mask11, axis=0)
+            pos_passed_fuel_mask_full = (x[:, None] >= fuel_x[None]) & is_stopped
+            pos_passed_fuel_mask = np.maximum.accumulate(pos_passed_fuel_mask_full, axis=0)
 
-            if fuel_dump != self.fuel_dumps[-1]:
+            if not is_last_iteration:
                 furthest_out = np.maximum.accumulate(x[:, None])
                 neg_passed_fuel_mask11 = (x[:, None] <= fuel_x[None]) & is_stopped & (furthest_out > fuel_x[None])
                 neg_passed_fuel_mask = np.maximum.accumulate(neg_passed_fuel_mask11, axis=0)
             else:
                 neg_passed_fuel_mask = np.zeros_like(pos_passed_fuel_mask)
 
-            withdrawn_fuels_multiplier = np.array(pos_passed_fuel_mask, dtype=int) + np.array(neg_passed_fuel_mask, dtype=int)
+            withdrawn_fuels_multiplier = np.array(pos_passed_fuel_mask, dtype=np.int32) + np.array(neg_passed_fuel_mask, dtype=np.int32)
             withdrawn_fuels_volume = withdrawn_fuels_multiplier * withdraw_volumes
             total_withdrawn_fuels_volume = np.sum(withdrawn_fuels_volume, axis=-1)
-            # c = b[a]
 
             net_fuel = total_withdrawn_fuels_volume - np.array(deposited_fuel)
 
@@ -200,11 +195,11 @@ class Visualizer:
         # plt.legend()
 
         ani = animation.FuncAnimation(fig, animate, frames=len(index_script))
-        animation_path = os.path.join(self.save_path, "animation.gif")
+        animation_path = os.path.join(self.save_path, f"animation{len(trips)}.gif")
         ani.save(animation_path, fps=fps)
 
 
 if __name__ == "__main__":
-    a = Visualizer()
-    a.simulate_trip(10)
-    a.visualize_trip()
+    solver = JeepSolver()
+    solver.simulate_trip()
+    solver.visualize_trip()
