@@ -121,25 +121,31 @@ class JeepSolver:
         self.plot_visulization(np.array(xs), np.array(fuels), np.array(trips), fuel_changes, fps, paus_time, do_animation)
 
     def plot_visulization(self, xs, fuels, trips, fuel_changes, fps, paus_time, do_animation):
-        fig, axs = plt.subplots(len(trips) + 1, figsize=(7, 2 + 1.5 * len(trips)), sharex=True)
-        axs[0].set_xlim(0, np.max(xs))
-        height = 1.5
-        axs[0].set_ylim(0, height)
-        axs[0].set_yticks([])
+        use_car_add = 1 if do_animation else 0
 
-        point, = axs[0].plot([], [], "bo", markersize=8, label="Jeep")
-        text = axs[0].text(0, 0, "", ha="center", va="bottom", fontsize=10, color="orange")
-        text2 = axs[0].text(0, 0, "", ha="center", va="bottom", fontsize=10)
+        fig, axs = plt.subplots(len(trips) + use_car_add, figsize=(7, 0.5 + 1.5 * (len(trips) + use_car_add)), sharex=True)
+        if len(trips) + use_car_add == 1:
+            axs = [axs]  # Why does matplotlib do this?
+
+        if use_car_add:
+            axs[0].set_xlim(0, np.max(xs))
+            height = 1.5
+            axs[0].set_ylim(0, height)
+            axs[0].set_yticks([])
+
+            point, = axs[0].plot([], [], "bo", markersize=8, label="Jeep")
+            text = axs[0].text(0, 0, "", ha="center", va="bottom", fontsize=10, color="orange")
+            text2 = axs[0].text(0, 0, "", ha="center", va="bottom", fontsize=10)
 
         lines = []
         for i, trip in enumerate(trips):
-            line = axs[i + 1].plot([], [], color="orange")
+            line = axs[i + use_car_add].plot([], [], color="orange")
             lines.append(line[0])
 
-            axs[i + 1].set_xlim(0, np.max(xs))
-            axs[i + 1].set_ylim(0, 1)
-            axs[i + 1].set_title(f"Trip {i + 1}")
-            axs[i + 1].set_ylabel("Fuel Level")
+            axs[i + use_car_add].set_xlim(0, np.max(xs))
+            axs[i + use_car_add].set_ylim(0, 1)
+            axs[i + use_car_add].set_title(f"Trip {i + 1}")
+            axs[i + use_car_add].set_ylabel("Fuel Level")
 
         plt.xlabel("Displacement")
         plt.tight_layout()
@@ -155,10 +161,10 @@ class JeepSolver:
             start_index = int(all_trips[trip_index][0])
             lines[trip_index].set_data(xs[start_index:index + 1], fuels[start_index:index + 1])
 
-            if trip_index == 4:
-                pass
-
             # print("Animating frame", i, "index:", index)
+            if not use_car_add:
+                return
+
             x = xs[index]
             point.set_data([x], [height / 2])
             text.set_position((x, height / 2 + 0.1))
@@ -198,6 +204,8 @@ class JeepSolver:
 
         index_script += list(range(fuel_changes[-1][0] if len(fuel_changes) else 0, len(xs))) + [len(xs) - 1] * paus_frames
         # """
+
+        # Unecessary to create entire script if not do_animation but whatever
 
         if not do_animation:
             animate(len(index_script) - 1)
