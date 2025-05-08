@@ -31,8 +31,8 @@ class JeepSolver:
     def simulate_trip(self, n=jeep_solver_config.n):
         self.fuel_dumps = []
 
-        for k in range(n - 1):
-            new_depo = self.get_depo(k, n - 1)
+        for k in range(1, n):  # could do range(n - 1) and self.get_depo(k, n - 1) instead to use 0-indices instead
+            new_depo = self.get_depo(k, n)
             self.fuel_dumps.append(new_depo)
 
         self.fuel_dumps = np.array(self.fuel_dumps).reshape(-1, 3)
